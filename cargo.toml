@@ -1,0 +1,9 @@
+[package]
+name = "cloth_simulation"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+wgpu-bootstrap = { git = "https://github.com/qlurkin/wgpu-bootstrap", tag = "v0.1.22" }
+winit = "0.27.5"
+bytemuck = { version = "1.4", features = [ "derive" ] }
