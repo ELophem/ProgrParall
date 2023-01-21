@@ -1,0 +1,1 @@
+c:\Users\edoua\Desktop\PrograParall\target\debug\cloth_simulation.exe: c:\Users\edoua\Desktop\PrograParall\src\cloth.wgsl c:\Users\edoua\Desktop\PrograParall\src\compute.wgsl c:\Users\edoua\Desktop\PrograParall\src\forces.wgsl c:\Users\edoua\Desktop\PrograParall\src\louisv.jpg c:\Users\edoua\Desktop\PrograParall\src\main.rs c:\Users\edoua\Desktop\PrograParall\src\sphere.wgsl
