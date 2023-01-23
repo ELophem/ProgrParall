@@ -1,5 +1,4 @@
-// parrallel programming project
-
+//Import des dépendances du package wgpu 
 use wgpu_bootstrap::{
     window::Window,
     frame::Frame,
@@ -14,10 +13,11 @@ use wgpu_bootstrap::{
     texture::create_texture_bind_group,
 };
 
+//On définit la structure de computedata qui va ensuite calculer tout les datas nécessaires.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct ComputeData {
-    delta_time: f32,
+    delta_time: f32,  //float32 value
     nb_vertices: f32,
     sphere_radius: f32,
     sphere_center_x: f32,
@@ -32,12 +32,14 @@ struct ComputeData {
     bend_damping: f32,
 }
 
+//On définit la vitesse qui est un array de 3 valeurs de type f32 trois valeurs car xyz
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct Velocity {
     pub velocity: [f32; 3]
 }
 
+//on définit la structure des ressorts
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct Spring {
@@ -46,20 +48,22 @@ struct Spring {
     pub rest_length: f32,
 }
 
-// we want to change the size of the cloth, the number of vertices and the start position
-const CLOTH_SIZE: f32 = 35.0;
-const N_CLOTH_VERTICES_PER_ROW: u32 = 25; // the cloth is a square, the minimum is 2
+
+//On définit les parametres de base de la simulation 
+//Les parametres du tissu
+const CLOTH_SIZE: f32 = 25.0;
+const N_CLOTH_VERTICES_PER_ROW: u32 = 25;
 const CLOTH_CENTER_X: f32 = 0.0;
-const CLOTH_CENTER_Y: f32 = 10.0;
+const CLOTH_CENTER_Y: f32 = 20.0;
 const CLOTH_CENTER_Z: f32 = 0.0;
-// Sphere
+
+//parametre de la sphère 
 const SPHERE_RADIUS: f32 = 10.0;
 const SPHERE_CENTER_X: f32 = 0.0;
 const SPHERE_CENTER_Y: f32 = 0.0;
 const SPHERE_CENTER_Z: f32 = 0.0;
-// Physics
 
-// const VERTEX_MASS: f32 = MASS / (N_CLOTH_VERTICES_PER_ROW * N_CLOTH_VERTICES_PER_ROW) as f32;
+//les parametres des vertices des ressorts et des mass
 const VERTEX_MASS: f32 = 0.3;
 const STRUCTURAL_STIFFNESS: f32 = 20.0;
 const SHEAR_STIFFNESS: f32 = 20.0;
@@ -68,42 +72,46 @@ const STRUCTURAL_DAMPING: f32 = 4.0;
 const SHEAR_DAMPING: f32 = 2.0;
 const BEND_DAMPING: f32 = 0.0;
 
+//On définit les la structure de base de notre simulation
 struct MyApp {
+    //Les caméras et la texture
     camera_bind_group: wgpu::BindGroup,
     texture_bind_group: wgpu::BindGroup,
-    // sphere
+    // la sphère
     sphere_pipeline: wgpu::RenderPipeline,
     sphere_vertex_buffer: wgpu::Buffer,
     sphere_index_buffer: wgpu::Buffer,
     sphere_indices: Vec<u16>,
-    // cloth
+    // clle tissu
     cloth_pipeline: wgpu::RenderPipeline,
     cloth_vertex_buffer: wgpu::Buffer,
     cloth_index_buffer: wgpu::Buffer,
     cloth_indices: Vec<u16>,
     // compute
     compute_pipeline: wgpu::ComputePipeline,
-    forces_compute_pipeline: wgpu::ComputePipeline,
     compute_vertices_bind_group: wgpu::BindGroup,
     compute_data_bind_group: wgpu::BindGroup,
     compute_velocities_bind_group: wgpu::BindGroup,
     compute_data_buffer: wgpu::Buffer,
 
-    // spring
+    // ressorts
     springs_bind_group: wgpu::BindGroup,
 }
 
+//implémentation de la structure de l'application
 impl MyApp {
     fn new(context: &Context) -> Self {
+
+        //création de la texture utilisé pour le tissu
         let texture = context.create_texture(
             "English",
             include_bytes!("louisv.jpg"),
-        
-        
         );
-
         let texture_bind_group = create_texture_bind_group(context, &texture);
 
+
+
+        //initialisation de la caméra et de ce qu'elle regarde
         let camera = Camera {
             eye: (20.0, 30.0, 20.0).into(),
             target: (0.0, 0.0, 0.0).into(),
@@ -113,11 +121,15 @@ impl MyApp {
             znear: 0.1,
             zfar: 1000.0,
         };
-
-        // camera ------------------------------------------------------------
+      
         let (_camera_buffer, camera_bind_group) = camera.create_camera_bind_group(context);
 
-        // sphere ------------------------------------------------------------
+        
+        //création du pipeline de la sphère 
+        // Le pipeline viens du fichier sphère.wgsl
+        //c'est  le procéssus qui permets d'afficher la sphère 
+
+
         let sphere_pipeline = context.create_render_pipeline(
             "Render Pipeline Sphere",
             include_str!("sphere.wgsl"),
@@ -128,20 +140,22 @@ impl MyApp {
 
         let (mut sphere_vertices, sphere_indices) = icosphere(4);
 
-        // change the radius of the sphere :
+        //rayon
         for vertex in sphere_vertices.iter_mut() {
             let mut posn = cgmath::Vector3::from(vertex.position);
             posn *= SPHERE_RADIUS as f32;
             vertex.position = posn.into()
         }
-        // change the center of the sphere :
+        //centre de la sphère 
         for vertex in sphere_vertices.iter_mut() {
             vertex.position[0] += SPHERE_CENTER_X;
             vertex.position[1] += SPHERE_CENTER_Y;
             vertex.position[2] += SPHERE_CENTER_Z;
         }
 
-        // create a buffer for the sphere
+        //buffers  la sphère buffer de vertices et buffer d'indices
+        //LEs buffers sont des endroits ou on va stocker les valeurs pour qu'on puisse les retenirs
+        //dans notre cas on a nos triangles de la sphère qui sont créer dans create buffer 
         let sphere_vertex_buffer = context.create_buffer(
             &sphere_vertices,
             wgpu::BufferUsages::VERTEX
@@ -151,7 +165,11 @@ impl MyApp {
             wgpu::BufferUsages::INDEX
         );
 
-        // Cloth ------------------------------------------------------------
+
+        //Tissu
+        
+        //construction du pipeline du tissu située dans cloth.wgsl
+
         let cloth_pipeline = context.create_render_pipeline(
             "Render Pipeline Cloth",
             include_str!("cloth.wgsl"),
@@ -164,11 +182,11 @@ impl MyApp {
         );
 
         
-        // create the cloth
+        // création du tissu en utilisants les vertices et indices
         let mut cloth_vertices = Vec::new();
         let mut cloth_indices: Vec<u16> = Vec::new();
         
-        // create the vertices
+        // vertices du tissu
         for i in 0..N_CLOTH_VERTICES_PER_ROW {
             for j in 0..N_CLOTH_VERTICES_PER_ROW {
                 cloth_vertices.push(Vertex {
@@ -187,7 +205,7 @@ impl MyApp {
             }
         }
 
-        // create the indices
+        // indices du tissus
         for i in 0..N_CLOTH_VERTICES_PER_ROW - 1 {
             for j in 0..N_CLOTH_VERTICES_PER_ROW - 1 {
                 // first triangle
@@ -201,7 +219,7 @@ impl MyApp {
             }
         }
 
-        // set the default speed of the cloth
+        // vitesse du tissu
         let mut cloth_velocities: Vec<Velocity> = Vec::new();
         for _i in cloth_vertices.iter_mut() {
             cloth_velocities.push(Velocity {
@@ -209,7 +227,7 @@ impl MyApp {
             });
         }
 
-        // create a buffer for the cloth
+        // buffers du tissus
         let cloth_vertex_buffer = context.create_buffer(
             &cloth_vertices,
             wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::STORAGE
@@ -223,17 +241,17 @@ impl MyApp {
             wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::VERTEX
         );
 
-        // create the compute pipeline
+
+        //compute
+        
+
+        // pipeline du compute 
         let compute_pipeline = context.create_compute_pipeline(
             "Compute Pipeline",
             include_str!("compute.wgsl"),
         );
-        // create the force compute pipeline
-        let forces_compute_pipeline = context.create_compute_pipeline(
-            "Forces Compute Pipeline",
-            include_str!("forces.wgsl")
-        );
 
+        // bind group des vertices 
         let compute_vertices_bind_group = context.create_bind_group(
             "compute vertices bind group",
             &compute_pipeline.get_bind_group_layout(0),
@@ -244,6 +262,8 @@ impl MyApp {
                 },
             ],
         );
+
+        //bind group velocitie
         let compute_velocities_bind_group = context.create_bind_group(
             "compute velocities bind group",
             &compute_pipeline.get_bind_group_layout(1),
@@ -255,7 +275,10 @@ impl MyApp {
             ],
         );
 
-        // compute data -----------------------------------------------------
+
+        //shaders compute va calculer tout valeurs déclarées précédemment 
+        
+        
         let compute_data = ComputeData {
             delta_time: 0.01,
             nb_vertices: (N_CLOTH_VERTICES_PER_ROW*N_CLOTH_VERTICES_PER_ROW) as f32,
@@ -272,6 +295,7 @@ impl MyApp {
             bend_damping: BEND_DAMPING,
         };
 
+        //calcule du buffer de données
         let compute_data_buffer = context.create_buffer(
             &[compute_data],
             wgpu::BufferUsages::UNIFORM,
@@ -288,12 +312,16 @@ impl MyApp {
             ],
         );
 
-        // Springs ----------------------------------------------------------
+
+        //ressorts 
+        
+        
+        //créer les 3 types différents de springs 
         let mut springs: Vec<Spring> = Vec::new();
         for i in 0..N_CLOTH_VERTICES_PER_ROW * N_CLOTH_VERTICES_PER_ROW {
             let col: i32 = (i % N_CLOTH_VERTICES_PER_ROW) as i32;
             let row: i32 = (i / N_CLOTH_VERTICES_PER_ROW) as i32;
-            // structural springs
+            //springs structurels (ceux en carré)
             for j in [-1,1] as [i32; 2] {
                 // col +- 1
                 let mut index2 = row * N_CLOTH_VERTICES_PER_ROW as i32 + col + j;
@@ -316,7 +344,9 @@ impl MyApp {
                     rest_length: (CLOTH_SIZE / (N_CLOTH_VERTICES_PER_ROW - 1) as f32),
                 });
             }
-            // shear springs
+
+
+            // Shear Spring (ceux en X)
             for j in [-1,1] as [i32; 2] {
                 // col + j and row + j
                 let mut index2 = (row + j) * N_CLOTH_VERTICES_PER_ROW as i32 + col + j;
@@ -339,7 +369,9 @@ impl MyApp {
                     rest_length: (CLOTH_SIZE / (N_CLOTH_VERTICES_PER_ROW - 1) as f32) * 1.41421356237,
                 });
             }
-            // bend springs
+
+
+            //Bend spring (ceux 2 à 2)
             for j in [-1,1] as [i32; 2] {
                 // col +- 2j
                 let mut index2 = row * N_CLOTH_VERTICES_PER_ROW as i32 + col + 2 * j;
@@ -364,12 +396,14 @@ impl MyApp {
             }
         }
 
-        // create a buffer for the springs
+
+        //Création du buffer de strings 
         let springs_buffer = context.create_buffer(
             springs.as_slice(),
             wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::VERTEX,
         );
-        // create a bind group for the springs
+
+        // le bind group des springs 
         let springs_bind_group = context.create_bind_group(
             "Sping Bind Group",
             &compute_pipeline.get_bind_group_layout(3),
@@ -384,44 +418,44 @@ impl MyApp {
         return Self {
             camera_bind_group,
             texture_bind_group,
-            // sphere
+            //Sphère
             sphere_pipeline,
             sphere_vertex_buffer,
             sphere_index_buffer,
             sphere_indices,
-            // cloth
+            // tissu
             cloth_pipeline,
             cloth_vertex_buffer,
             cloth_index_buffer,
             cloth_indices,
             // compute
             compute_pipeline,
-            forces_compute_pipeline,
             compute_vertices_bind_group,
             compute_velocities_bind_group,
             compute_data_bind_group,
             compute_data_buffer,
 
-            // springs
+            // ressorts 
             springs_bind_group,
         };
-    }
-    
+    }   
 }
 
+//création de l'application
+//créer nouvelle fenêtre
 impl Application for MyApp {
     fn render(&self, context: &Context) -> Result<(), wgpu::SurfaceError> {
         let mut frame = Frame::new(context)?;
 
         {
             let mut render_pass = frame.begin_render_pass(wgpu::Color {r: 0.85, g: 0.85, b: 0.85, a: 1.0});
-            // render the sphere
+            // on reçoit les valeurs du pipeline de la sphère et de ces indices et vertices
             render_pass.set_pipeline(&self.sphere_pipeline);
             render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
             render_pass.set_vertex_buffer(0, self.sphere_vertex_buffer.slice(..));
             render_pass.set_index_buffer(self.sphere_index_buffer.slice(..), wgpu::IndexFormat::Uint16);
             render_pass.draw_indexed(0..self.sphere_indices.len() as u32, 0, 0..1);
-            // render the cloth as a triangle list
+            //il déssine le tissu 
             render_pass.set_pipeline(&self.cloth_pipeline);
             render_pass.set_bind_group(0, &self.texture_bind_group, &[]);
             render_pass.set_bind_group(1, &self.camera_bind_group, &[]);
@@ -436,7 +470,7 @@ impl Application for MyApp {
     }
 
     fn update(&mut self, context: &Context, delta_time: f32) {
-        // update the compute data
+        // ensuite une fois tout déssiné de base il va update les données du tissu utilisant le shader compute 
         let compute_data = ComputeData {
             delta_time,
             nb_vertices: (N_CLOTH_VERTICES_PER_ROW*N_CLOTH_VERTICES_PER_ROW) as f32,
@@ -458,15 +492,7 @@ impl Application for MyApp {
 
         {
             let mut compute_pass = computation.begin_compute_pass();
-            // calculate the forces
-            compute_pass.set_pipeline(&self.forces_compute_pipeline);
-            compute_pass.set_bind_group(0, &self.compute_vertices_bind_group, &[]);
-            compute_pass.set_bind_group(1, &self.compute_velocities_bind_group, &[]);
-            compute_pass.set_bind_group(2, &self.compute_data_bind_group, &[]);
-            compute_pass.set_bind_group(3, &self.springs_bind_group, &[]);
-            compute_pass.dispatch_workgroups(((N_CLOTH_VERTICES_PER_ROW*N_CLOTH_VERTICES_PER_ROW) as f64/128.0).ceil() as u32, 1, 1);
-
-            // update the positions and collisions
+            //MAJ des positions et des collisions 
             compute_pass.set_pipeline(&self.compute_pipeline);
             compute_pass.set_bind_group(0, &self.compute_vertices_bind_group, &[]);
             compute_pass.set_bind_group(1, &self.compute_velocities_bind_group, &[]);

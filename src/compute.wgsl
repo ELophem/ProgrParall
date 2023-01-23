@@ -63,7 +63,18 @@ fn main(@builtin(global_invocation_id) param: vec3<u32>) {
 
     let distance = length(position - sphere_center);
 
-    verticiesVelocities[param.x].velocity_x += 0.0;
+    //verticiesVelocities[param.x].velocity_x += 0.0;
+    var gravity_a = vec3<f32>(0.0, 0.0, 0.0);
+    gravity_a.y += -9.81 * data.vertex_mass;
+
+    // update the velocity of the vertex
+    verticiesVelocities[param.x].velocity_x += (gravity_a.x / data.vertex_mass) * data.delta_time;
+    verticiesVelocities[param.x].velocity_y += (gravity_a.y / data.vertex_mass) * data.delta_time;
+    verticiesVelocities[param.x].velocity_z += (gravity_a.z / data.vertex_mass) * data.delta_time;
+
+    // update the position of the vertex, or it crashes
+    verticiesPositions[param.x].position_x += 0.0;
+
 
     if (distance < sphere_radius) {
         // the vertex is inside the sphere

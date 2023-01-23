@@ -1,4 +1,7 @@
-// Vertex shader
+// Vertex shader fichier wgsl est un language qui est utilisé par WGPU 
+//Pour effectuer des calculs sur le GPU pour réaliser les calculs nécessaires 
+//pour la réalisation et l'affichage des objets 
+//Shader pour le tissu 
 
 struct CameraUniform {
     view: mat4x4<f32>,
