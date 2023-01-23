@@ -62,26 +62,21 @@ fn main(@builtin(global_invocation_id) param: vec3<u32>) {
     let position = vec3<f32>(verticiesPositions[param.x].position_x, verticiesPositions[param.x].position_y, verticiesPositions[param.x].position_z);
 
     let distance = length(position - sphere_center);
-
-    //verticiesVelocities[param.x].velocity_x += 0.0;
     var gravity_a = vec3<f32>(0.0, 0.0, 0.0);
     gravity_a.y += -9.81 * data.vertex_mass;
 
-    // update the velocity of the vertex
+    // MAJ des vertices de vitesse 
     verticiesVelocities[param.x].velocity_x += (gravity_a.x / data.vertex_mass) * data.delta_time;
     verticiesVelocities[param.x].velocity_y += (gravity_a.y / data.vertex_mass) * data.delta_time;
     verticiesVelocities[param.x].velocity_z += (gravity_a.z / data.vertex_mass) * data.delta_time;
 
-    // update the position of the vertex, or it crashes
+    // MAJ des positions des vertices 
     verticiesPositions[param.x].position_x += 0.0;
 
-
+    //si la distance est plus petite que le rayon de la sphère alors cela veux dire 
+    //que notre tissu est dans la sphère donc on doit MAJ les vertices de positions 
+    // en faisant la normale et mettre à jour les vertices de vitesse à 0 car les particules sur la sphère ne doivent plus accélerer
     if (distance < sphere_radius) {
-        // the vertex is inside the sphere
-        // we need to push it out of the sphere
-        // we do this by calculating the normal of the sphere at the vertex position
-        // and then we push the vertex in the opposite direction of the normal
-
         let normal = normalize(position - sphere_center);
 
         verticiesPositions[param.x].position_x += normal.x * (sphere_radius - distance);
